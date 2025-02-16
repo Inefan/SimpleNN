@@ -1,0 +1,65 @@
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader, random_split
+import torchvision
+from torchvision.datasets import MNIST
+import struct
+import os
+import numpy as np
+from array import array
+from os import path
+from PIL import Image
+
+
+train_dataset = MNIST(root="./data", train=True, download=True)
+test_dataset = MNIST(root="./data", train=False, download=True)
+
+
+def read(dataset):
+    if dataset == "training":
+        path_img = './data/MNIST/raw/train-images-idx3-ubyte'
+        path_lbl = './data/MNIST/raw/train-labels-idx1-ubyte'
+    elif dataset == "testing":
+        path_img = './data/MNIST/raw/t10k-images-idx3-ubyte'
+        path_lbl = './data/MNIST/raw/t10k-labels-idx1-ubyte'
+    else:
+        raise ValueError("dataset must be 'training' or 'testing'")
+
+  
+    with open(path_lbl, 'rb') as f_label:
+        _, size = struct.unpack(">II", f_label.read(8))
+        labels = array('b', f_label.read())
+
+   
+    with open(path_img, 'rb') as f_img:
+        _, size, rows, cols = struct.unpack(">IIII", f_img.read(16))
+        images = array('B', f_img.read())
+
+    return labels, images, size, rows, cols
+
+
+def write_dataset(labels, data, size, rows, cols, output_dir):
+    classes = {i: f"class_{i}" for i in range(10)}
+
+    output_dirs = {i: path.join(output_dir, classes[i]) for i in range(10)}
+    for dir in output_dirs.values():
+        os.makedirs(dir, exist_ok=True)  
+
+    for i, label in enumerate(labels):
+        output_filename = path.join(output_dirs[label], f"{i}.jpg")
+        print(f'Writing {output_filename}')
+
+        data_i = [
+            data[(i * rows * cols + j * cols): (i * rows * cols + (j + 1) * cols)]
+            for j in range(rows)
+        ]
+        data_array = np.asarray(data_i, dtype=np.uint8)
+
+        im = Image.fromarray(data_array)
+        im.save(output_filename)
+
+
+output_path = './mnist'
+
+for dataset in ['training', 'testing']:
+    write_dataset(*read(dataset), path.join(output_path, dataset))
